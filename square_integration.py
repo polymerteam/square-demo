@@ -4,6 +4,7 @@ from functools import reduce
 # The base URL for every Connect API request
 connection = httplib.HTTPSConnection('connect.squareup.com')
 
+
 # Obtains all of the business's location IDs. Each location has its own collection of inventory, payments, etc.
 def get_location_ids(request_headers):
 	request_path = '/v1/me/locations'
@@ -53,13 +54,14 @@ def get_inventory_changes(begin_time, end_time, access_token, ITEM_ID_TO_ITEM_NA
 		# sanity check: print each payment:
 		for payment in payments_array:
 			print(str(payment['name']) + ': ' + str(payment['quantity']))
+
 		total_for_item = reduce(lambda sum, payment: sum + float(payment['quantity']), payments_array, 0)
 		print('TOTAL for ' + str(payment['name']) + ': ' + str(total_for_item))
 		print('_______________________')
 		inventory_changes.append({
 			'item_id': item_id,
 			'quantity_sold': total_for_item,
-			'name': ITEM_ID_TO_ITEM_NAME_MAP[item_id]
+			'info': ITEM_ID_TO_ITEM_NAME_MAP[item_id]
 		})
 	connection.close()
 	return inventory_changes
