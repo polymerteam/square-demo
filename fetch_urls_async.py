@@ -11,14 +11,15 @@ def getAuthorJSON(response, *args, **kwargs):
 	mutex.acquire()
 	try:
 		downloaded_data_array.append(json.loads(response.content))
-		print "DONE: " + response.url
+		if response.status_code is not 200:
+			raise Exception("ASYNC DOWNLOAD failed with status %d: %s" % (response.status_code, response.url))
+		print "FINISHED DOWNLOADING FROM: " + response.url
 	finally:
 		mutex.release()
 
 
 def exception_handler(request, exception):
-	print "ERROR: request failed: " + request.url + "<<<<<<<"
-	print ("Request error: {0}".format(exception))
+	raise Exception(exception)
 
 
 # Main function

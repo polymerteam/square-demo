@@ -12,5 +12,10 @@ ITEM_ID_TO_ITEM_NAME_MAP = {
 	'7G662Y2EY3QEM6YMV3RDGNOQ': {'square_name': 'Piura Blanco, Peru 70%', 'polymer_process_type_id': 18, 'polymer_product_type_id': 14},
 }
 
-inventory_changes = get_inventory_changes(begin_time, end_time, access_token, ITEM_ID_TO_ITEM_NAME_MAP)
-pprint(inventory_changes)
+try:
+	inventory_changes = get_inventory_changes(begin_time, end_time, access_token, ITEM_ID_TO_ITEM_NAME_MAP)
+	pprint(inventory_changes)
+except Exception as e:
+	print('Fetching Inventory data from square terminated due to exception:')
+	print(e)
+
