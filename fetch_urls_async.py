@@ -29,7 +29,9 @@ def fetch_urls_async(urls_to_fetch, headers):
 	unsent_requests = []
 	for url in urls_to_fetch:
 		unsent_requests.append(grequests.get(url, hooks={'response': getAuthorJSON}, headers=headers))
-	# All urls have finished downloading after this line
-	grequests.map(unsent_requests, exception_handler=exception_handler)  # actually make requests
+	# NOTE FOR FUTURE IMPROVEMENTS: Square Connect V1 throws a 429 if more than size=4 requests are made in a burst
+	# This is fine if you have <= 4 urls (stores, in our case), but not optimal for LOTS of stores.
+	# Dandelion's 8 stores take 4 seconds to run the entire script on my laptop.
+	grequests.map(unsent_requests, exception_handler=exception_handler, size=4)  # actually make requests
 	return downloaded_data_array
 
