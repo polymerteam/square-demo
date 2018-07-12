@@ -3,8 +3,8 @@ from pprint import pprint
 import os
 
 # Sample Usage for Alabama
-begin_time = '2017-11-01T00:00:00-08:00'
-end_time = '2018-02-01T00:00:00-08:00'
+begin_time = '2017-12-01T00:00:00-08:00'
+end_time = '2018-01-01T00:00:00-08:00'
 access_token = os.environ['SQUARE_ACCESS_TOKEN']
 ITEM_ID_TO_ITEM_NAME_MAP = {
 	'CIRMY5XHPTZQIQZD5JZLU64C': {'square_name': 'Maya Mountain, Belize 70%', 'polymer_process_type_id': 18, 'polymer_product_type_id': 32},
