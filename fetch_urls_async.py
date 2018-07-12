@@ -1,6 +1,7 @@
 import json
-import grequests 
+import grequests
 from threading import RLock
+from pprint import pprint
 mutex = RLock()
 
 # GLOBALS
@@ -12,6 +13,7 @@ def getAuthorJSON(response, *args, **kwargs):
 	try:
 		downloaded_data_array.append(json.loads(response.content))
 		if response.status_code is not 200:
+			pprint(response.content)
 			raise Exception("ASYNC DOWNLOAD failed with status %d: %s" % (response.status_code, response.url))
 		print "FINISHED DOWNLOADING FROM: " + response.url
 	finally:
@@ -30,3 +32,4 @@ def fetch_urls_async(urls_to_fetch, headers):
 	# All urls have finished downloading after this line
 	grequests.map(unsent_requests, exception_handler=exception_handler)  # actually make requests
 	return downloaded_data_array
+
