@@ -1,19 +1,13 @@
-import httplib, urllib, json
+import urllib
 from functools import reduce
 from fetch_urls_async import fetch_urls_async
-
-# The base URL for every Connect API request
-connection = httplib.HTTPSConnection('connect.squareup.com')
 
 
 # Obtains all of the business's location IDs. Each location has its own collection of inventory, payments, etc.
 def get_location_payment_urls(request_headers, time_range):
-	# Get a list of all location ids
-	request_path = '/v1/me/locations'
-	connection.request('GET', request_path, '', request_headers)
-	response = connection.getresponse()
-	# Transform the JSON array of locations into a Python list
-	locations = json.loads(response.read())
+	# Get a list of all location ids (only one GET request, but use same helper for consistency)
+	locations_url = 'https://connect.squareup.com/v1/me/locations'
+	locations = fetch_urls_async([locations_url], request_headers)[0]
 
 	# Format a payments urls for each location
 	location_payment_urls = []
@@ -35,8 +29,7 @@ def get_payments_by_item_id(time_range, request_headers, ITEM_ID_TO_ITEM_NAME_MA
 	# Parse all payments and group relavent group by item_id (product type)
 	for payments in all_location_payments:
 		for payment in payments:
-			print (payment['itemizations'])
-			for item_detail in payment['itemizations']:
+			for item_detail in payment.get('itemizations', []):
 				item_id = item_detail['item_detail'].get('item_id', False)
 				# Some payments did not specify a product (item), and we want only the subset specified in ITEM_ID_TO_ITEM_NAME_MAP
 				if item_id and ITEM_ID_TO_ITEM_NAME_MAP.get(item_id, False):
@@ -67,5 +60,5 @@ def get_inventory_changes(begin_time, end_time, access_token, ITEM_ID_TO_ITEM_NA
 			'quantity_sold': total_for_item,
 			'info': ITEM_ID_TO_ITEM_NAME_MAP[item_id]
 		})
-	connection.close()
 	return inventory_changes
+
