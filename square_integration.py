@@ -1,6 +1,6 @@
+from fetch_urls_async import fetch_urls_async
 import urllib
 from functools import reduce
-from fetch_urls_async import fetch_urls_async
 import dateutil.parser
 from pprint import pprint
 import pickle
@@ -43,8 +43,8 @@ def get_sorted_unique_payments(all_location_payments):
 	return sorted(unique_payments, key=get_datetime_object)
 
 
-# Returns a dict {item_id -> [payment_object], ...} of all ids specified in ITEM_ID_TO_ITEM_NAME_MAP
-def get_payments_by_item_id(time_range, request_headers, ITEM_ID_TO_ITEM_NAME_MAP):
+# Returns a dict {item_id -> [payment_object], ...} of all ids specified in team_products
+def get_payments_by_item_id(time_range, request_headers, team_products):
 	item_id_to_payments_map = {}
 
 	# Download all payment from each location asynchronously, get unique ones
@@ -63,8 +63,8 @@ def get_payments_by_item_id(time_range, request_headers, ITEM_ID_TO_ITEM_NAME_MA
 			continue  # payments includes one object of store meta info, which we skip
 		for item_detail in payment.get('itemizations', []):
 			item_id = item_detail['item_detail'].get('item_id', False)
-			# Some payments did not specify a product (item), and we want only the subset specified in ITEM_ID_TO_ITEM_NAME_MAP
-			if item_id and ITEM_ID_TO_ITEM_NAME_MAP.get(item_id, False):
+			# Some payments did not specify a product (item), and we want only the subset specified in team_products
+			if item_id and team_products.get(item_id, False):
 				item_detail['created_at'] = created_at
 				if item_id_to_payments_map.get(item_id, False):
 					item_id_to_payments_map[item_id].append(item_detail)
@@ -76,36 +76,41 @@ def get_payments_by_item_id(time_range, request_headers, ITEM_ID_TO_ITEM_NAME_MA
 def get_most_recent_payment(payments_array):
 	return max(payments_array, key=get_datetime_object)
 
+def get_adjustment_explenation(square_name, item_id):
+	return 'Automated Square integration adjustment for %s (%s)' % (square_name, item_id)
 
-def get_inventory_changes(begin_time, end_time, access_token, ITEM_ID_TO_ITEM_NAME_MAP):
+def get_inventory_changes(begin_time, end_time, access_token, team_products):
 	# Request payments made from begin_time (inclusive) to end_time (exclusive), sorted chronologically
 	time_range = {'begin_time': begin_time, 'end_time': end_time, 'order': 'ASC'}
 	request_headers = {'Authorization': 'Bearer ' + access_token, 'Accept': 'application/json', 'Content-Type': 'application/json'}
-	payments_by_item_id = get_payments_by_item_id(time_range, request_headers, ITEM_ID_TO_ITEM_NAME_MAP)
+	payments_by_item_id = get_payments_by_item_id(time_range, request_headers, team_products)
 
 	print('ITEMS SOLD:')
-	inventory_changes = []
-	most_recents_payments_for_each_item = []
+	adjustments = []
+	most_recents_payment_for_each_item = []
 	for item_id, payments_array in payments_by_item_id.iteritems():
 		# Stash the most recent payment for this item, which we'll use to determine the most recent for ALL items
-		most_recents_payments_for_each_item.append(payments_array[-1])  # because it's sorted oldest-newest
+		most_recents_payment_for_each_item.append(payments_array[-1])  # because it's sorted oldest-newest
 		# sanity check: print each payment:
 		for payment in payments_array:
 			print(str(payment['name']) + ': ' + str(payment['quantity']) + ', ' + str(payment['created_at']))
 
-		total_for_item = reduce(lambda sum, payment: sum + float(payment['quantity']), payments_array, 0)
-		print('TOTAL for ' + str(payment['name']) + ': ' + str(total_for_item))
+		total_amount_for_item = reduce(lambda sum, payment: sum + float(payment['quantity']), payments_array, 0)
+		print('TOTAL for ' + str(payment['name']) + ': ' + str(total_amount_for_item))
 		print('_______________________')
-		inventory_changes.append({
-			'item_id': item_id,
-			'quantity_sold': total_for_item,
-			'info': ITEM_ID_TO_ITEM_NAME_MAP[item_id]
+		info = team_products[item_id]
+		adjustments.append({
+			'userprofile': 0,
+			'process_id': info['polymer_process_id'],
+			'product_id': info['polymer_product_id'],
+			'amount': total_amount_for_item,
+			'explanation': get_adjustment_explenation(info['square_name'], item_id),
 		})
 
-	most_recent_change = get_most_recent_payment(most_recents_payments_for_each_item)['created_at']
+	most_recent_change = get_most_recent_payment(most_recents_payment_for_each_item)['created_at']
 	print('MOST RECENT OF ALL: ' + most_recent_change)
 	return {
-		'inventory_changes': inventory_changes,
+		'adjustments': adjustments,
 		'most_recent_change': most_recent_change,
 	}
 
