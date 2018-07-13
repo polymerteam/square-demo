@@ -20,33 +20,50 @@ def get_location_payment_urls(request_headers, time_range):
 	return location_payment_urls
 
 
-# Returns a dict {item_id -> [payment_obect], ...} of all ids specified in ITEM_ID_TO_ITEM_NAME_MAP
+# Remove potential duplicate values from the list of payments
+# The official Square sample script does this, so we do, too.
+def get_unique_payments(all_location_payments):
+	seen_payment_ids = set()
+	unique_payments = []
+	payments = reduce(lambda sum, payments: sum + payments, all_location_payments, [])
+
+	for payment in payments:
+		if payment['id'] in seen_payment_ids:
+			continue
+		seen_payment_ids.add(payment['id'])
+		unique_payments.append(payment)
+	return unique_payments
+
+
+# Returns a dict {item_id -> [payment_object], ...} of all ids specified in ITEM_ID_TO_ITEM_NAME_MAP
 def get_payments_by_item_id(time_range, request_headers, ITEM_ID_TO_ITEM_NAME_MAP):
 	item_id_to_payments_map = {}
 
-	# Download all payment from each location asynchronously
+	# Download all payment from each location asynchronously, get unique ones
 	location_payment_urls = get_location_payment_urls(request_headers, time_range)
 	all_location_payments = fetch_urls_async(location_payment_urls, request_headers)
+	unique_payments = get_unique_payments(all_location_payments)
 
-	# Parse all payments and group relavent group by item_id (product type)
-	for payments in all_location_payments:
-		for payment in payments:
-			created_at = payment.get('created_at', False)  # store to use for finding most recent item
-			if not created_at:
-				continue  # payments includes one object of store meta info, which we skip
-			for item_detail in payment.get('itemizations', []):
-				item_id = item_detail['item_detail'].get('item_id', False)
-				# Some payments did not specify a product (item), and we want only the subset specified in ITEM_ID_TO_ITEM_NAME_MAP
-				if item_id and ITEM_ID_TO_ITEM_NAME_MAP.get(item_id, False):
-					item_detail['created_at'] = created_at
-					if item_id_to_payments_map.get(item_id, False):
-						item_id_to_payments_map[item_id].append(item_detail)
-					else:
-						item_id_to_payments_map[item_id] = [item_detail]
+	# Parse all payments and group relevant group by item_id (product type)
+	for payment in unique_payments:
+		created_at = payment.get('created_at', False)  # store to use for finding most recent item
+		if not created_at:
+			continue  # payments includes one object of store meta info, which we skip
+		for item_detail in payment.get('itemizations', []):
+			item_id = item_detail['item_detail'].get('item_id', False)
+			# Some payments did not specify a product (item), and we want only the subset specified in ITEM_ID_TO_ITEM_NAME_MAP
+			if item_id and ITEM_ID_TO_ITEM_NAME_MAP.get(item_id, False):
+				item_detail['created_at'] = created_at
+				if item_id_to_payments_map.get(item_id, False):
+					item_id_to_payments_map[item_id].append(item_detail)
+				else:
+					item_id_to_payments_map[item_id] = [item_detail]
 	return item_id_to_payments_map
+
 
 def get_most_recent_payment(payments_array):
 	return max(payments_array, key=lambda p: dateutil.parser.parse(p['created_at']))
+
 
 def get_inventory_changes(begin_time, end_time, access_token, ITEM_ID_TO_ITEM_NAME_MAP):
 	# Request payments made from begin_time (inclusive) to end_time (exclusive), sorted chronologically
@@ -74,4 +91,3 @@ def get_inventory_changes(begin_time, end_time, access_token, ITEM_ID_TO_ITEM_NA
 
 	print('MOST RECENT OF ALL: ' + get_most_recent_payment(most_recents_payments_for_each_item)['created_at'])
 	return inventory_changes
-
