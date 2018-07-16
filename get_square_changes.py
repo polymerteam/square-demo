@@ -1,4 +1,4 @@
-from fetch_urls_async import fetch_urls_async
+from dispatch_requests_in_parallel import dispatch_requests_in_parallel
 import urllib
 from functools import reduce
 import dateutil.parser
@@ -10,7 +10,7 @@ import pickle
 def get_location_payment_urls(request_headers, time_range):
 	# Get a list of all location ids (only one GET request, but use same helper for consistency)
 	locations_url = 'https://connect.squareup.com/v1/me/locations'
-	locations = fetch_urls_async([locations_url], request_headers)[0]
+	locations = dispatch_requests_in_parallel([locations_url], request_headers)[0]
 
 	# Format a payments urls for each location
 	location_payment_urls = []
@@ -47,7 +47,7 @@ def get_payments_by_item_id(time_range, request_headers, team_products):
 
 	# Download all payment from each location asynchronously, get unique ones
 	# location_payment_urls = get_location_payment_urls(request_headers, time_range)
-	# all_location_payments = fetch_urls_async(location_payment_urls, request_headers)
+	# all_location_payments = dispatch_requests_in_parallel(location_payment_urls, request_headers)
 	# def save_obj(obj):
 	# 	with open('moc_db.txt', 'wb') as f:
 	# 		pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
@@ -84,7 +84,7 @@ def get_adjustment_explenation(square_name, most_recent_change):
 	return 'This adjustment was made automatically based on sales of "%s" on Square on or before %s.' % (square_name, date_display_str)
 
 
-def get_inventory_changes(begin_time, end_time, access_token, team_products):
+def get_square_changes(begin_time, end_time, access_token, team_products):
 	# Request payments made from begin_time (inclusive) to end_time (exclusive), sorted chronologically
 	time_range = {'begin_time': begin_time, 'end_time': end_time, 'order': 'ASC'}
 	request_headers = {'Authorization': 'Bearer ' + access_token, 'Accept': 'application/json', 'Content-Type': 'application/json'}

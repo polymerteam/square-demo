@@ -27,7 +27,7 @@ def exception_handler(request, exception):
 
 
 # Main function
-def fetch_urls_async(urls_to_fetch, headers, method='GET', data=None):
+def dispatch_requests_in_parallel(urls_to_fetch, headers, method='GET', data=None):
 	unsent_requests = []
 	for url in urls_to_fetch:
 		if method == 'GET':

@@ -1,5 +1,5 @@
 from get_product_mappings_for_all_teams import get_product_mappings_for_all_teams
-from square_integration import get_inventory_changes
+from get_square_changes import get_square_changes
 from make_polymer_adjustments import make_polymer_adjustments, update_begin_time, get_begin_time
 from pprint import pprint
 from datetime import datetime
@@ -16,7 +16,7 @@ for polymer_team, team_data in get_product_mappings_for_all_teams().iteritems():
 		end_time = '2017-12-05T00:00:00-08:00'  # datetime.utcnow()
 
 		print('Requesting inventory data from Square for %s__________________________' % polymer_team)
-		inventory_changes = get_inventory_changes(begin_time, end_time, team_data['access_token'], team_data['team_products'])
+		inventory_changes = get_square_changes(begin_time, end_time, team_data['access_token'], team_data['team_products'])
 		pprint(inventory_changes)
 		print('\n\n')
 		print('Requesting Polymer inventory adjustments for %s__________________________' % polymer_team)

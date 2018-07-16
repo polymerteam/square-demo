@@ -1,4 +1,4 @@
-from fetch_urls_async import fetch_urls_async
+from dispatch_requests_in_parallel import dispatch_requests_in_parallel
 from pprint import pprint
 import json
 
@@ -7,7 +7,7 @@ def make_polymer_adjustments(adjustments):
 		pprint(adjustment)
 		adjustment_url = 'https://eszlr18ifi.execute-api.us-west-1.amazonaws.com/staging/ics/v11/adjustments/'
 		headers = {'Content-type' : 'application/json'}
-		fetch_urls_async([adjustment_url], headers, 'POST', json.dumps(adjustment))
+		dispatch_requests_in_parallel([adjustment_url], headers, 'POST', json.dumps(adjustment))
 
 
 def update_begin_time(most_recent_time):
