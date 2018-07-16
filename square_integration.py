@@ -22,8 +22,6 @@ def get_location_payment_urls(request_headers, time_range):
 
 
 def get_datetime_object(payment):
-	if payment.get('created_at', -1) is -1:
-		pprint(payment)
 	return dateutil.parser.parse(payment['created_at'])
 
 
@@ -50,6 +48,10 @@ def get_payments_by_item_id(time_range, request_headers, team_products):
 	# Download all payment from each location asynchronously, get unique ones
 	# location_payment_urls = get_location_payment_urls(request_headers, time_range)
 	# all_location_payments = fetch_urls_async(location_payment_urls, request_headers)
+	# def save_obj(obj):
+	# 	with open('moc_db.txt', 'wb') as f:
+	# 		pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
+	# save_obj(all_location_payments)
 	def load_obj():
 		with open('moc_db.txt', 'rb') as f:
 			return pickle.load(f)
@@ -76,8 +78,11 @@ def get_payments_by_item_id(time_range, request_headers, team_products):
 def get_most_recent_payment(payments_array):
 	return max(payments_array, key=get_datetime_object)
 
-def get_adjustment_explenation(square_name, item_id):
-	return 'Automated Square integration adjustment for %s (%s)' % (square_name, item_id)
+
+def get_adjustment_explenation(square_name, most_recent_change):
+	date_display_str = dateutil.parser.parse(most_recent_change).strftime('%c')
+	return 'This adjustment was made automatically based on sales of "%s" on Square on or before %s.' % (square_name, date_display_str)
+
 
 def get_inventory_changes(begin_time, end_time, access_token, team_products):
 	# Request payments made from begin_time (inclusive) to end_time (exclusive), sorted chronologically
@@ -85,38 +90,22 @@ def get_inventory_changes(begin_time, end_time, access_token, team_products):
 	request_headers = {'Authorization': 'Bearer ' + access_token, 'Accept': 'application/json', 'Content-Type': 'application/json'}
 	payments_by_item_id = get_payments_by_item_id(time_range, request_headers, team_products)
 
-	print('ITEMS SOLD:')
 	adjustments = []
 	most_recents_payment_for_each_item = []
 	for item_id, payments_array in payments_by_item_id.iteritems():
 		# Stash the most recent payment for this item, which we'll use to determine the most recent for ALL items
 		most_recents_payment_for_each_item.append(payments_array[-1])  # because it's sorted oldest-newest
-		# sanity check: print each payment:
-		for payment in payments_array:
-			print(str(payment['name']) + ': ' + str(payment['quantity']) + ', ' + str(payment['created_at']))
-
 		total_amount_for_item = reduce(lambda sum, payment: sum + float(payment['quantity']), payments_array, 0)
-		print('TOTAL for ' + str(payment['name']) + ': ' + str(total_amount_for_item))
-		print('_______________________')
 		info = team_products[item_id]
+		most_recent_change = get_most_recent_payment(most_recents_payment_for_each_item)['created_at']
 		adjustments.append({
-			'userprofile': 0,
-			'process_id': info['polymer_process_id'],
-			'product_id': info['polymer_product_id'],
+			'userprofile': 1,
+			'process_type': info['polymer_process_id'],
+			'product_type': info['polymer_product_id'],
 			'amount': total_amount_for_item,
-			'explanation': get_adjustment_explenation(info['square_name'], item_id),
+			'explanation': get_adjustment_explenation(info['square_name'], most_recent_change),
 		})
-
-	most_recent_change = get_most_recent_payment(most_recents_payment_for_each_item)['created_at']
-	print('MOST RECENT OF ALL: ' + most_recent_change)
 	return {
 		'adjustments': adjustments,
 		'most_recent_change': most_recent_change,
 	}
-
-# ADJUSTMENT REQUEST:
-# userProfileId,
-# selectedInventory.process_id,
-# selectedInventory.product_id,
-# amount,
-# explanation
