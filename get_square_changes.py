@@ -84,7 +84,7 @@ def get_adjustment_explenation(square_name, most_recent_change):
 	return 'This adjustment was made automatically based on sales of "%s" on Square on or before %s.' % (square_name, date_display_str)
 
 
-def get_square_changes(begin_time, end_time, access_token, team_products):
+def get_square_changes(begin_time, end_time, access_token, team_products, polymer_team_id):
 	# Request payments made from begin_time (inclusive) to end_time (exclusive), sorted chronologically
 	time_range = {'begin_time': begin_time, 'end_time': end_time, 'order': 'ASC'}
 	request_headers = {'Authorization': 'Bearer ' + access_token, 'Accept': 'application/json', 'Content-Type': 'application/json'}
@@ -104,6 +104,7 @@ def get_square_changes(begin_time, end_time, access_token, team_products):
 			'product_type': info['polymer_product_id'],
 			'amount': total_amount_for_item,
 			'explanation': get_adjustment_explenation(info['square_name'], most_recent_change),
+			'team_id': polymer_team_id,
 		})
 	return {
 		'adjustments': adjustments,
