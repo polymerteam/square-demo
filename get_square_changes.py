@@ -2,16 +2,14 @@ from dispatch_requests_in_parallel import dispatch_requests_in_parallel
 import urllib
 from functools import reduce
 import dateutil.parser
-from make_get_request import make_get_request
-import pickle
-from pprint import pprint
+from make_request import make_request
 
 
 # Obtains all of the business's location IDs. Each location has its own collection of inventory, payments, etc.
 def get_location_payment_urls(request_headers, time_range):
 	# Get a list of all location ids (only one GET request, but use same helper for consistency)
 	locations_url = 'https://connect.squareup.com/v1/me/locations'
-	locations = make_get_request(locations_url,request_headers)
+	locations = make_request(locations_url, request_headers)
 
 	# Format a payments urls to fetch payment data from each location
 	location_payment_urls = []
@@ -31,7 +29,7 @@ def get_datetime_object(payment):
 def get_sorted_unique_payments(all_location_payments):
 	seen_payment_ids = set()
 	unique_payments = []
-	print("Number of unfiltered payments from each location:")
+	print("Number of unfiltered payments from each location (note Square throttles after 200):")
 	for payments in all_location_payments:
 		print(str(len(payments)))
 	payments = reduce(lambda sum, payments: sum + payments, all_location_payments, [])
@@ -47,21 +45,13 @@ def get_sorted_unique_payments(all_location_payments):
 	return sorted(unique_payments, key=get_datetime_object)
 
 
-# Returns a dict {item_id -> [payment_object], ...} of all ids specified in team_products
+# Returns a dict {item_id -> [payment_object], ...} for all ids specified in team_products which have payments
 def get_payments_by_item_id(time_range, request_headers, team_products):
 	item_id_to_payments_map = {}
 
 	# Download all payment from each location in parallel batches, get unique ones
 	location_payment_urls = get_location_payment_urls(request_headers, time_range)
 	all_location_payments = dispatch_requests_in_parallel(location_payment_urls, request_headers)
-	# def save_obj(obj):
-	# 	with open('moc_db.txt', 'wb') as f:
-	# 		pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
-	# save_obj(all_location_payments)
-	# def load_obj():
-	# 	with open('moc_db.txt', 'rb') as f:
-	# 		return pickle.load(f)
-	# all_location_payments = load_obj()
 	sorted_unique_payments = get_sorted_unique_payments(all_location_payments)
 
 	# Parse all payments and group relevant group by item_id (product type)
@@ -83,7 +73,7 @@ def get_most_recent_payment(payments_array):
 	return max(payments_array, key=get_datetime_object)
 
 
-def get_adjustment_explenation(square_name, last_synced_with_square_at):
+def get_adjustment_explanation(square_name, last_synced_with_square_at):
 	date_display_str = dateutil.parser.parse(last_synced_with_square_at).strftime('%c')
 	return 'This adjustment was made automatically based on sales of "%s" on Square on or before %s.' % (square_name, date_display_str)
 
@@ -91,7 +81,11 @@ def get_adjustment_explenation(square_name, last_synced_with_square_at):
 def get_square_changes(begin_time, end_time, access_token, team_products, polymer_team_id):
 	# Reads'Request (up to 200) payments made from begin_time (inclusive) to end_time (exclusive), sorted chronologically'
 	time_range = {'begin_time': begin_time, 'end_time': end_time, 'order': 'ASC', 'limit': 200}  # 200 is max allowed
-	request_headers = {'Authorization': 'Bearer ' + access_token, 'Accept': 'application/json', 'Content-Type': 'application/json'}
+	request_headers = {
+		'Authorization': 'Bearer ' + access_token,
+		'Accept': 'application/json',
+		'Content-Type': 'application/json'
+	}
 	payments_by_item_id = get_payments_by_item_id(time_range, request_headers, team_products)
 
 	adjustments = []
@@ -106,7 +100,7 @@ def get_square_changes(begin_time, end_time, access_token, team_products, polyme
 			'process_type': info['polymer_process_id'],
 			'product_type': info['polymer_product_id'],
 			'amount': total_amount_for_item,
-			'explanation': get_adjustment_explenation(info['square_name'], end_time),
+			'explanation': get_adjustment_explanation(info['square_name'], end_time),
 		})
 	return {
 		'adjustment_requests': adjustments,
