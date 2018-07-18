@@ -1,4 +1,5 @@
 from dispatch_requests_in_parallel import dispatch_requests_in_parallel
+from make_get_request import make_get_request
 import json
 import requests
 
@@ -12,7 +13,7 @@ def make_polymer_adjustments(inventory_changes):
 
 def get_last_square_sync_times():
 	url = POLYMER_SQUARE_ENDPOINT + 'update-times/'
-	team_update_times = requests.get(url).json()
+	team_update_times = make_get_request(url)
 
 	last_square_sync_times = {}
 	for team_update_time in team_update_times:

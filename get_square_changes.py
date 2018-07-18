@@ -2,7 +2,7 @@ from dispatch_requests_in_parallel import dispatch_requests_in_parallel
 import urllib
 from functools import reduce
 import dateutil.parser
-import requests
+from make_get_request import make_get_request
 import pickle
 from pprint import pprint
 
@@ -11,7 +11,7 @@ from pprint import pprint
 def get_location_payment_urls(request_headers, time_range):
 	# Get a list of all location ids (only one GET request, but use same helper for consistency)
 	locations_url = 'https://connect.squareup.com/v1/me/locations'
-	locations = requests.get(locations_url, headers=request_headers).json()
+	locations = make_get_request(locations_url,request_headers)
 
 	# Format a payments urls to fetch payment data from each location
 	location_payment_urls = []
