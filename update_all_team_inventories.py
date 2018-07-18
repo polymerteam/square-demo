@@ -15,19 +15,22 @@ last_square_sync_times = get_last_square_sync_times()
 
 for polymer_team, team_data in get_product_mappings_for_all_teams().iteritems():
 	try:
-		begin_time = last_square_sync_times[team_data['polymer_team_id']]  # '2018-03-27T01:50:16Z'
-		end_time = arrow.utcnow().isoformat() # '2018-03-27T05:50:16Z'  #'2018-07-18T01:21:21.554316+00:00'
+		begin_time = last_square_sync_times[team_data['polymer_team_id']]  # '2018-01-01T00:00:00Z'
+		end_time = arrow.utcnow().isoformat() # '2018-02-02T00:00:00Z'
 		print('Begin time: ' + begin_time)
 		print('end time:' + str(end_time))
+
 		print('Requesting inventory data from Square for %s__________________________' % polymer_team)
 		inventory_changes = get_square_changes(begin_time, end_time, team_data['access_token'], team_data['team_products'], team_data['polymer_team_id'])
 		pprint(inventory_changes)
-		print('\n\n')
+
+		print('\n')
 		print('Requesting Polymer inventory adjustments for %s__________________________' % polymer_team)
 		if inventory_changes['last_synced_with_square_at'] is not None:
 			make_polymer_adjustments(inventory_changes)
+		print('\n\n\n')
 
 	except Exception as e:
 		print('Updating inventory based on Square transactions terminated due to an exception:')
 		print(e)
-		raise  # FOR DEBUG ONLY
+		# raise  # FOR DEBUG ONLY
