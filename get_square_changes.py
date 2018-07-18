@@ -2,8 +2,8 @@ from dispatch_requests_in_parallel import dispatch_requests_in_parallel
 import urllib
 from functools import reduce
 import dateutil.parser
-from pprint import pprint
 import pickle
+from pprint import pprint
 
 
 # Obtains all of the business's location IDs. Each location has its own collection of inventory, payments, etc.
@@ -46,16 +46,16 @@ def get_payments_by_item_id(time_range, request_headers, team_products):
 	item_id_to_payments_map = {}
 
 	# Download all payment from each location asynchronously, get unique ones
-	# location_payment_urls = get_location_payment_urls(request_headers, time_range)
-	# all_location_payments = dispatch_requests_in_parallel(location_payment_urls, request_headers)
+	location_payment_urls = get_location_payment_urls(request_headers, time_range)
+	all_location_payments = dispatch_requests_in_parallel(location_payment_urls, request_headers)
 	# def save_obj(obj):
 	# 	with open('moc_db.txt', 'wb') as f:
 	# 		pickle.dump(obj, f, pickle.HIGHEST_PROTOCOL)
 	# save_obj(all_location_payments)
-	def load_obj():
-		with open('moc_db.txt', 'rb') as f:
-			return pickle.load(f)
-	all_location_payments = load_obj()
+	# def load_obj():
+	# 	with open('moc_db.txt', 'rb') as f:
+	# 		return pickle.load(f)
+	# all_location_payments = load_obj()
 	sorted_unique_payments = get_sorted_unique_payments(all_location_payments)
 
 	# Parse all payments and group relevant group by item_id (product type)
@@ -79,8 +79,8 @@ def get_most_recent_payment(payments_array):
 	return max(payments_array, key=get_datetime_object)
 
 
-def get_adjustment_explenation(square_name, most_recent_change):
-	date_display_str = dateutil.parser.parse(most_recent_change).strftime('%c')
+def get_adjustment_explenation(square_name, last_synced_with_square_at):
+	date_display_str = dateutil.parser.parse(last_synced_with_square_at).strftime('%c')
 	return 'This adjustment was made automatically based on sales of "%s" on Square on or before %s.' % (square_name, date_display_str)
 
 
@@ -92,21 +92,25 @@ def get_square_changes(begin_time, end_time, access_token, team_products, polyme
 
 	adjustments = []
 	most_recents_payment_for_each_item = []
+	last_synced_with_square_at = None
 	for item_id, payments_array in payments_by_item_id.iteritems():
 		# Stash the most recent payment for this item, which we'll use to determine the most recent for ALL items
 		most_recents_payment_for_each_item.append(payments_array[-1])  # because it's sorted oldest-newest
+		for payment in payments_array:
+			print(str(payment['name']) + ': ' + str(payment['quantity']) + ', ' + str(payment['created_at']))
+
 		total_amount_for_item = reduce(lambda sum, payment: sum + float(payment['quantity']), payments_array, 0)
 		info = team_products[item_id]
-		most_recent_change = get_most_recent_payment(most_recents_payment_for_each_item)['created_at']
+		last_synced_with_square_at = get_most_recent_payment(most_recents_payment_for_each_item)['created_at']
 		adjustments.append({
 			'userprofile': 1,
 			'process_type': info['polymer_process_id'],
 			'product_type': info['polymer_product_id'],
 			'amount': total_amount_for_item,
-			'explanation': get_adjustment_explenation(info['square_name'], most_recent_change),
+			'explanation': get_adjustment_explenation(info['square_name'], last_synced_with_square_at),
 			'team_id': polymer_team_id,
 		})
 	return {
-		'adjustments': adjustments,
-		'most_recent_change': most_recent_change,
+		'adjustment_requests': adjustments,
+		'last_synced_with_square_at': last_synced_with_square_at,
 	}
