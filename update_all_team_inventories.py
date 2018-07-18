@@ -2,14 +2,13 @@ from get_product_mappings_for_all_teams import get_product_mappings_for_all_team
 from get_square_changes import get_square_changes
 from make_polymer_adjustments import make_polymer_adjustments, get_last_square_sync_times
 from pprint import pprint
-from datetime import datetime, timedelta
-import dateutil.parser
 import arrow
 
 
 # Runs a square fetch of payment data for the time period specified for each Polymer team specified.
-# Makes necessary adjustments to Polymer's database, then updates begin_time to the most recent
-# payment made + 1 second, which serves as the (inclusive) lower-bound for its next execution.
+# Makes necessary adjustments to Polymer's database, then saves (exclusive) end_time for use as begin_time (inclusive)
+# for the next time a Square sync is run.
+# If any exception thrown, aborts that team's Square sync, and continues on to the remaining teams.
 
 
 last_square_sync_times = get_last_square_sync_times()
@@ -31,4 +30,4 @@ for polymer_team, team_data in get_product_mappings_for_all_teams().iteritems():
 	except Exception as e:
 		print('Updating inventory based on Square transactions terminated due to an exception:')
 		print(e)
-		raise
+		raise  # FOR DEBUG ONLY
