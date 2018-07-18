@@ -2,6 +2,7 @@ from dispatch_requests_in_parallel import dispatch_requests_in_parallel
 import urllib
 from functools import reduce
 import dateutil.parser
+import requests
 import pickle
 from pprint import pprint
 
@@ -10,9 +11,9 @@ from pprint import pprint
 def get_location_payment_urls(request_headers, time_range):
 	# Get a list of all location ids (only one GET request, but use same helper for consistency)
 	locations_url = 'https://connect.squareup.com/v1/me/locations'
-	locations = dispatch_requests_in_parallel([locations_url], request_headers)[0]
+	locations = requests.get(locations_url, headers=request_headers).json()
 
-	# Format a payments urls for each location
+	# Format a payments urls to fetch payment data from each location
 	location_payment_urls = []
 	parameters = urllib.urlencode(time_range)
 	for location in locations:
@@ -30,14 +31,19 @@ def get_datetime_object(payment):
 def get_sorted_unique_payments(all_location_payments):
 	seen_payment_ids = set()
 	unique_payments = []
+	print("Number of unfiltered payments from each location:")
+	for payments in all_location_payments:
+		print(str(len(payments)))
 	payments = reduce(lambda sum, payments: sum + payments, all_location_payments, [])
+	print('Total payments (all locations):  ' + str(len(payments)))
 
 	for payment in payments:
-		# Filter duplicates or the store-info object that come with each store's payments
+		# Filter duplicates or anything without a date
 		if payment['id'] in seen_payment_ids or payment.get('created_at', None) is None:
 			continue
 		seen_payment_ids.add(payment['id'])
 		unique_payments.append(payment)
+	print('Unique payments (all locations): ' + str(len(unique_payments)))
 	return sorted(unique_payments, key=get_datetime_object)
 
 
@@ -45,7 +51,7 @@ def get_sorted_unique_payments(all_location_payments):
 def get_payments_by_item_id(time_range, request_headers, team_products):
 	item_id_to_payments_map = {}
 
-	# Download all payment from each location asynchronously, get unique ones
+	# Download all payment from each location in parallel batches, get unique ones
 	location_payment_urls = get_location_payment_urls(request_headers, time_range)
 	all_location_payments = dispatch_requests_in_parallel(location_payment_urls, request_headers)
 	# def save_obj(obj):
@@ -60,9 +66,7 @@ def get_payments_by_item_id(time_range, request_headers, team_products):
 
 	# Parse all payments and group relevant group by item_id (product type)
 	for payment in sorted_unique_payments:
-		created_at = payment.get('created_at', False)  # store to use for finding most recent item
-		if not created_at:
-			continue  # payments includes one object of store meta info, which we skip
+		created_at = payment['created_at']  # store to use for finding most recent item
 		for item_detail in payment.get('itemizations', []):
 			item_id = item_detail['item_detail'].get('item_id', False)
 			# Some payments did not specify a product (item), and we want only the subset specified in team_products
@@ -85,32 +89,27 @@ def get_adjustment_explenation(square_name, last_synced_with_square_at):
 
 
 def get_square_changes(begin_time, end_time, access_token, team_products, polymer_team_id):
-	# Request payments made from begin_time (inclusive) to end_time (exclusive), sorted chronologically
-	time_range = {'begin_time': begin_time, 'end_time': end_time, 'order': 'ASC'}
+	# Reads'Request (up to 200) payments made from begin_time (inclusive) to end_time (exclusive), sorted chronologically'
+	time_range = {'begin_time': begin_time, 'end_time': end_time, 'order': 'ASC', 'limit': 200}  # 200 is max allowed
 	request_headers = {'Authorization': 'Bearer ' + access_token, 'Accept': 'application/json', 'Content-Type': 'application/json'}
 	payments_by_item_id = get_payments_by_item_id(time_range, request_headers, team_products)
 
 	adjustments = []
-	most_recents_payment_for_each_item = []
-	last_synced_with_square_at = None
 	for item_id, payments_array in payments_by_item_id.iteritems():
-		# Stash the most recent payment for this item, which we'll use to determine the most recent for ALL items
-		most_recents_payment_for_each_item.append(payments_array[-1])  # because it's sorted oldest-newest
-		for payment in payments_array:
+		for payment in payments_array:  # SANITY CHECK
 			print(str(payment['name']) + ': ' + str(payment['quantity']) + ', ' + str(payment['created_at']))
 
 		total_amount_for_item = reduce(lambda sum, payment: sum + float(payment['quantity']), payments_array, 0)
 		info = team_products[item_id]
-		last_synced_with_square_at = get_most_recent_payment(most_recents_payment_for_each_item)['created_at']
 		adjustments.append({
 			'userprofile': 1,
 			'process_type': info['polymer_process_id'],
 			'product_type': info['polymer_product_id'],
 			'amount': total_amount_for_item,
-			'explanation': get_adjustment_explenation(info['square_name'], last_synced_with_square_at),
-			'team_id': polymer_team_id,
+			'explanation': get_adjustment_explenation(info['square_name'], end_time),
 		})
 	return {
 		'adjustment_requests': adjustments,
-		'last_synced_with_square_at': last_synced_with_square_at,
+		'last_synced_with_square_at': end_time,
+		'team_id': polymer_team_id,
 	}
