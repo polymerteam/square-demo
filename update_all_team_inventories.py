@@ -1,4 +1,4 @@
-from get_product_mappings_for_all_teams import get_product_mappings_for_all_teams
+from get_sku_mappings_for_all_teams import get_sku_mappings_for_all_teams
 from get_square_changes import get_square_changes
 from make_polymer_adjustments import make_polymer_adjustments, get_last_square_sync_times
 from pprint import pprint
@@ -13,7 +13,7 @@ import arrow
 
 last_square_sync_times = get_last_square_sync_times()
 
-for polymer_team, team_data in get_product_mappings_for_all_teams().iteritems():
+for polymer_team, team_data in get_sku_mappings_for_all_teams().iteritems():
 	try:
 		begin_time = last_square_sync_times[team_data['polymer_team_id']]  # '2018-01-01T00:00:00Z'
 		end_time = arrow.utcnow().isoformat() # '2018-02-02T00:00:00Z'
@@ -21,7 +21,7 @@ for polymer_team, team_data in get_product_mappings_for_all_teams().iteritems():
 		print('end time:' + str(end_time))
 
 		print('Requesting inventory data from Square for %s__________________________' % polymer_team)
-		inventory_changes = get_square_changes(begin_time, end_time, team_data['access_token'], team_data['team_products'], team_data['polymer_team_id'])
+		inventory_changes = get_square_changes(begin_time, end_time, team_data['access_token'], team_data['team_skus'], team_data['polymer_team_id'])
 		pprint(inventory_changes)
 
 		print('\n')

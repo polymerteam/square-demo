@@ -45,8 +45,8 @@ def get_sorted_unique_payments(all_location_payments):
 	return sorted(unique_payments, key=get_datetime_object)
 
 
-# Returns a dict {item_id -> [payment_object], ...} for all ids specified in team_products which have payments
-def get_payments_by_item_id(time_range, request_headers, team_products):
+# Returns a dict {item_id -> [payment_object], ...} for all ids specified in team_skus which have payments
+def get_payments_by_item_id(time_range, request_headers, team_skus):
 	item_id_to_payments_map = {}
 
 	# Download all payment from each location in parallel batches, get unique ones
@@ -59,8 +59,8 @@ def get_payments_by_item_id(time_range, request_headers, team_products):
 		created_at = payment['created_at']  # store to use for finding most recent item
 		for item_detail in payment.get('itemizations', []):
 			item_id = item_detail['item_detail'].get('item_id', False)
-			# Some payments did not specify a product (item), and we want only the subset specified in team_products
-			if item_id and team_products.get(item_id, False):
+			# Some payments did not specify a product (item), and we want only the subset specified in team_skus
+			if item_id and team_skus.get(item_id, False):
 				item_detail['created_at'] = created_at
 				if item_id_to_payments_map.get(item_id, False):
 					item_id_to_payments_map[item_id].append(item_detail)
@@ -78,7 +78,7 @@ def get_adjustment_explanation(square_name, last_synced_with_square_at):
 	return 'This adjustment was made automatically based on sales of "%s" on Square on or before %s.' % (square_name, date_display_str)
 
 
-def get_square_changes(begin_time, end_time, access_token, team_products, polymer_team_id):
+def get_square_changes(begin_time, end_time, access_token, team_skus, polymer_team_id):
 	# Reads'Request (up to 200) payments made from begin_time (inclusive) to end_time (exclusive), sorted chronologically'
 	time_range = {'begin_time': begin_time, 'end_time': end_time, 'order': 'ASC', 'limit': 200}  # 200 is max allowed
 	request_headers = {
@@ -86,7 +86,7 @@ def get_square_changes(begin_time, end_time, access_token, team_products, polyme
 		'Accept': 'application/json',
 		'Content-Type': 'application/json'
 	}
-	payments_by_item_id = get_payments_by_item_id(time_range, request_headers, team_products)
+	payments_by_item_id = get_payments_by_item_id(time_range, request_headers, team_skus)
 
 	adjustments = []
 	for item_id, payments_array in payments_by_item_id.iteritems():
@@ -94,7 +94,7 @@ def get_square_changes(begin_time, end_time, access_token, team_products, polyme
 			print(str(payment['name']) + ': ' + str(payment['quantity']) + ', ' + str(payment['created_at']))
 
 		total_amount_for_item = reduce(lambda sum, payment: sum + float(payment['quantity']), payments_array, 0)
-		info = team_products[item_id]
+		info = team_skus[item_id]
 		adjustments.append({
 			'userprofile': 1,
 			'process_type': info['polymer_process_id'],
